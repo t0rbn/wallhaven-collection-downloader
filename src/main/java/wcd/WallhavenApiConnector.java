@@ -1,4 +1,4 @@
-package wallhaven;
+package wcd;
 
 import org.json.JSONObject;
 
@@ -10,7 +10,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
@@ -28,7 +27,6 @@ public class WallhavenApiConnector {
     }
 
     public Set<WallpaperCollection> getUserCollections() throws URISyntaxException, IOException, InterruptedException {
-        System.out.println("getting collections");
         var request = HttpRequest.newBuilder(new URI("https://wallhaven.cc/api/v1/collections/" + userName + "?apikey=" + apiKey))
                 .GET()
                 .build();
@@ -48,12 +46,15 @@ public class WallhavenApiConnector {
         var collections = new HashSet<WallpaperCollection>();
         for (int i = 0; i < responseCollectionsArray.length(); i++) {
             var current = responseCollectionsArray.getJSONObject(i);
-            collections.add(new WallpaperCollection(current.getNumber("id").toString(), current.getString("label")));
+            var id = current.getNumber("id").toString();
+            var name = current.getString("label");
+            var urls = this.getCollectionDownloadUrls(id);
+            collections.add(new WallpaperCollection(name, urls));
         }
         return collections;
     }
 
-    public void downloadCollectionById(String id, Path destination) throws URISyntaxException, IOException, InterruptedException {
+    private Set<String> getCollectionDownloadUrls(String id) throws URISyntaxException, IOException, InterruptedException {
         var request = HttpRequest.newBuilder(new URI("https://wallhaven.cc/api/v1/collections/" + userName + "/" + id + "?apikey=" + apiKey))
                 .GET()
                 .build();
@@ -67,15 +68,18 @@ public class WallhavenApiConnector {
             var current = responseCollectionsArray.getJSONObject(i);
             urls.add(current.getString("path"));
         }
+        return urls;
+    }
 
-        urls.forEach((url) -> {
-            var filename = url.split("/")[url.split("/").length - 1];
-            try {
-                Files.copy(new URL(url).openStream(), Paths.get(destination.toString(), '/' + filename), StandardCopyOption.REPLACE_EXISTING);
-                Thread.sleep(1500); // circumvent wallhaven api rate limit in the ugliest way possible
-            } catch (IOException | InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
+    public void downloadUrl(String url, String destination) {
+        var paramUrl = url + "?apikey=" + apiKey;
+        try {
+            var destinationPath = Paths.get(destination);
+            Files.createDirectories(destinationPath);
+            Files.copy(new URL(paramUrl).openStream(), destinationPath, StandardCopyOption.REPLACE_EXISTING);
+            Thread.sleep(1500); // circumvent wallhaven api rate limit in the ugliest way possible
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }
