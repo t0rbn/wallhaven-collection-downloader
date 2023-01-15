@@ -28,7 +28,6 @@ public class Application {
                 .filter(s -> !s.isBlank())
                 .collect(Collectors.toSet());
 
-
         if (!collectionNamesToDownload.isEmpty()) {
             collections = collections.stream().filter(c -> collectionNamesToDownload.contains(c.getName())).collect(Collectors.toSet());
         }

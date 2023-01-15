@@ -54,21 +54,36 @@ public class WallhavenApiConnector {
         return collections;
     }
 
-    private Set<String> getCollectionDownloadUrls(String id) throws URISyntaxException, IOException, InterruptedException {
-        var request = HttpRequest.newBuilder(new URI("https://wallhaven.cc/api/v1/collections/" + userName + "/" + id + "?apikey=" + apiKey))
+    private Set<String> getCollectionDownloadUrls(String id, int page) throws URISyntaxException, IOException, InterruptedException {
+        var request = HttpRequest.newBuilder(new URI("https://wallhaven.cc/api/v1/collections/" + userName + "/" + id + "?apikey=" + apiKey + "&page=" + page))
                 .GET()
                 .build();
 
         var httpClient = HttpClient.newHttpClient();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-        var responseCollectionsArray = new JSONObject(response.body()).getJSONArray("data");
+        var responseJson = new JSONObject(response.body());
+        var responseCollectionsArray = responseJson.getJSONArray("data");
         var urls = new HashSet<String>();
         for (int i = 0; i < responseCollectionsArray.length(); i++) {
             var current = responseCollectionsArray.getJSONObject(i);
             urls.add(current.getString("path"));
         }
-        return urls;
+
+        var currentPage = responseJson.getJSONObject("meta").getInt("current_page");
+        var last_page = responseJson.getJSONObject("meta").getInt("last_page");
+
+        if (currentPage < last_page) {
+            var returnSet = new HashSet<>(urls);
+            returnSet.addAll(this.getCollectionDownloadUrls(id, currentPage + 1));
+            return returnSet;
+        } else {
+            return urls;
+        }
+    }
+
+    private Set<String> getCollectionDownloadUrls(String id) throws URISyntaxException, IOException, InterruptedException {
+        return this.getCollectionDownloadUrls(id, 1);
     }
 
     public void downloadUrl(String url, String destination) {
