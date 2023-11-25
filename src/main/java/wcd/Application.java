@@ -3,44 +3,39 @@ package wcd;
 import java.io.File;
 import java.io.IOException;
 import java.net.URISyntaxException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Application {
 
-    public static final String DEFAULT_SYNC_DIR = System.getProperty("user.home") + "/Pictures/Wallpapers";
-
-    public static void main(String... args) throws URISyntaxException, IOException, InterruptedException {
-        var username = CliUtils.read("Wallhaven Username:");
-        var apiKey = CliUtils.readPassword("Wallhaven API Key:");
-
-        CliUtils.write("getting collections...");
-        var connector = new WallhavenApiConnector(username, apiKey);
-        var collections = connector.getUserCollections();
-
-        CliUtils.write("Found collections '" + collections.stream().map(WallpaperCollection::getName).collect(Collectors.joining("', '")) + "'");
-
-        var collectionNamesToDownload = Arrays.stream(CliUtils.read("Enter collections to download as comma separated list. Leave empty to download all.")
-                .split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .collect(Collectors.toSet());
-
-        if (!collectionNamesToDownload.isEmpty()) {
-            collections = collections.stream().filter(c -> collectionNamesToDownload.contains(c.getName())).collect(Collectors.toSet());
+    public static void main(String... args) throws URISyntaxException, IOException, InterruptedException{
+        if (args.length < 3) {
+            System.out.println();
+            CliUtils.printHelp();
+            return;
         }
 
-        var selectedBasePath = CliUtils.read("Target path (default " + DEFAULT_SYNC_DIR +"):");
-        var basePath = selectedBasePath.isBlank() ? DEFAULT_SYNC_DIR : selectedBasePath;
+        var username = args[0];
+        var apiKey = args[1];
+        var syncPath = args[2];
+
+        var connector = new WallhavenApiConnector(username, apiKey);
+        var allCollections = connector.getUserCollections();
+        Set<WallpaperCollection> syncCollections;
+
+        if (args.length == 3) {
+            syncCollections = allCollections;
+        } else {
+            var syncCollectionNames = Arrays.stream(args).skip(3l).collect(Collectors.toSet());
+            syncCollections = allCollections.stream().filter(c -> syncCollectionNames.contains(c.getName())).collect(Collectors.toSet());
+        }
 
         // url -> FS path
         var urlPathMap = new HashMap<String, String>();
-        collections.forEach(collection -> {
+        syncCollections.forEach(collection -> {
             collection.getDownloadUrls().forEach(url -> {
                 var targetPathFragment = url.split("/");
-                var targetPath = basePath + '/' + collection.getName() + '/' + targetPathFragment[targetPathFragment.length - 1];
+                var targetPath = syncPath + '/' + collection.getName() + '/' + targetPathFragment[targetPathFragment.length - 1];
                 urlPathMap.put(url, targetPath);
             });
         });
@@ -56,7 +51,7 @@ public class Application {
         });
 
         // delete files not in sync with remote and empty directories\
-        Arrays.stream(Objects.requireNonNull(new File(basePath).listFiles()))
+        Arrays.stream(Objects.requireNonNull(new File(syncPath).listFiles()))
                 .filter(File::isDirectory)
                         .forEach(collectionDir -> {
                             Arrays.stream(collectionDir.listFiles()).forEach(f -> {
@@ -67,7 +62,7 @@ public class Application {
                             });
                         });
 
-        Arrays.stream(Objects.requireNonNull(new File(basePath).listFiles())).filter(File::isDirectory).forEach(directory -> {
+        Arrays.stream(Objects.requireNonNull(new File(syncPath).listFiles())).filter(File::isDirectory).forEach(directory -> {
             if (Objects.requireNonNull(directory.listFiles()).length == 0) {
                 CliUtils.write("deleting directory " + directory);
                 directory.delete();

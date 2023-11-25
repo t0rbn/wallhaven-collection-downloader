@@ -6,19 +6,8 @@ public class CliUtils {
         System.out.println(line);
     }
 
-    public static String read(String description) {
-        CliUtils.write(description);
-        return System.console().readLine();
+    public static void printHelp() {
+        CliUtils.write("usage: java -jar file/to/this.jar username apiKey sync-path [optional: collections]");
+        CliUtils.write("e.G. java -jar file/to/this.jar foobar Password123 /home/foobar/ -> sync all collections into folder 'foobar'");
     }
-
-    public static String readPassword(String description) {
-        CliUtils.write(description);
-        return String.valueOf(System.console().readPassword());
-    }
-
-    public static String read(String description, String defaultValue) {
-        var input = CliUtils.read(description);
-        return (input == null || input.isBlank()) ? defaultValue : input;
-    }
-
 }
